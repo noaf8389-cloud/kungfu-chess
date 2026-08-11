@@ -3,12 +3,19 @@
 
 #include "bus/event_bus.hpp"
 #include "bus/game_events.hpp"
+#include "../matches/no_op_game_history_store.hpp"
 #include "../player_registry.hpp"
 #include "../db/player_account_store.hpp"
 #include "logging/logger.hpp"
 
 RatingUpdater::RatingUpdater(EventBus& bus, PlayerRegistry& registry, PlayerAccountStore& accounts)
-    : registry_(registry), accounts_(accounts) {
+    : registry_(registry), accounts_(accounts),
+      ownedHistoryStore_(std::make_unique<NoOpGameHistoryStore>()), historyStore_(*ownedHistoryStore_) {
+    bus.subscribe<GameOverEvent>([this](const GameOverEvent& event) { onGameOver(event); });
+}
+
+RatingUpdater::RatingUpdater(EventBus& bus, PlayerRegistry& registry, PlayerAccountStore& accounts, GameHistoryStore& historyStore)
+    : registry_(registry), accounts_(accounts), historyStore_(historyStore) {
     bus.subscribe<GameOverEvent>([this](const GameOverEvent& event) { onGameOver(event); });
 }
 
@@ -35,4 +42,6 @@ void RatingUpdater::onGameOver(const GameOverEvent& event) {
     Logger::info("Rating update: " + *winnerName + " " + std::to_string(*winnerRating) + "->" +
                  std::to_string(result.newWinnerRating) + ", " + *loserName + " " +
                  std::to_string(*loserRating) + "->" + std::to_string(result.newLoserRating));
+
+    historyStore_.recordGame(*winnerName, *loserName);
 }

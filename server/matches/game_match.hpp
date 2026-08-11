@@ -6,13 +6,17 @@
 #include <ixwebsocket/IXWebSocket.h>
 
 #include "bus/event_bus.hpp"
+#include "game_history_store.hpp"
 #include "game_session.hpp"
+#include "nats_event_mirror.hpp"
 #include "player_registry.hpp"
 #include "network/command_handler.hpp"
 #include "network/network_publisher.hpp"
 #include "rating/rating_updater.hpp"
 #include "logic/model/game_state.hpp"
 #include "db/player_account_store.hpp"
+
+class NatsPublisher;
 
 // One independent, self-contained running match: its own board/state, its own
 // event bus, its own 2-color PlayerRegistry, and the session/network/rating
@@ -21,8 +25,13 @@
 class GameMatch {
 public:
     // Builds a fresh match on startingBoard. accounts is shared across every
-    // match on the server (one accounts database, not one per match).
-    GameMatch(Board startingBoard, PlayerAccountStore& accounts);
+    // match on the server (one accounts database, not one per match). natsPublisher
+    // is likewise shared — this match's GameOverEvent is mirrored through it.
+    // Default: owns its own NoOpGameHistoryStore (recorded results are discarded).
+    GameMatch(Board startingBoard, PlayerAccountStore& accounts, NatsPublisher& natsPublisher);
+    // Injected: this match's result is recorded through historyStore, shared
+    // across every match on the server like accounts/natsPublisher.
+    GameMatch(Board startingBoard, PlayerAccountStore& accounts, NatsPublisher& natsPublisher, GameHistoryStore& historyStore);
 
     // Advances this match by deltaMs (moves/jumps/rests) and forfeits any
     // player whose disconnect grace period has expired. Call once per server
@@ -57,5 +66,8 @@ private:
     GameSession session_;
     CommandHandler commandHandler_;
     NetworkPublisher publisher_;
+    std::unique_ptr<GameHistoryStore> ownedHistoryStore_;
+    GameHistoryStore& historyStore_;
     RatingUpdater ratingUpdater_;
+    NatsEventMirror natsEventMirror_;
 };

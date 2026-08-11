@@ -6,6 +6,6 @@
 int main(int argc, char** argv) {
     std::string layoutPath = argc > 1 ? argv[1] : "../../ui/CTD26-main/layout_standard.txt";
     Logger::init("server.log");
-    Server server(layoutPath, 8080);
+    Server server(layoutPath, 8080, 8081);
     return server.run();
 }

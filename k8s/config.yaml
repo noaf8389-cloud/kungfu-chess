@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ctd-config
+data:
+  POSTGRES_HOST: postgres
+  POSTGRES_PORT: "5432"
+  POSTGRES_DB: kungfuchess
+  POSTGRES_USER: kungfuchess
+  REDIS_HOST: redis
+  REDIS_PORT: "6379"
+  NATS_URL: nats://nats:4222
+  WS_GATEWAY_HOST: ws-gateway
+  WS_GATEWAY_INTERNAL_PORT: "8082"
+  MATCHMAKER_HOST: matchmaker
+  MATCHMAKER_PORT: "8083"
+  LOG_DIR: /logs
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ctd-secrets
+type: Opaque
+stringData:
+  POSTGRES_PASSWORD: devpassword

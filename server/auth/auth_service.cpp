@@ -2,7 +2,7 @@
 
 #include "logging/logger.hpp"
 
-AuthService::AuthService(PlayerAccountStore& accounts, LobbyRegistry& lobbyRegistry, GameRegistry& gameRegistry)
+AuthService::AuthService(PlayerAccountStore& accounts, LobbyRegistry& lobbyRegistry, ShardLookup& gameRegistry)
     : accounts_(accounts), lobbyRegistry_(lobbyRegistry), gameRegistry_(gameRegistry) {}
 
 AuthResult AuthService::login(LobbyRegistry::ConnectionId lobbyId, const std::string& username, const std::string& password) {

@@ -2,12 +2,28 @@
 
 #include <utility>
 
-GameMatch::GameMatch(Board startingBoard, PlayerAccountStore& accounts)
+#include "no_op_game_history_store.hpp"
+
+GameMatch::GameMatch(Board startingBoard, PlayerAccountStore& accounts, NatsPublisher& natsPublisher)
     : gameState_(std::move(startingBoard)),
       session_(gameState_, bus_),
       commandHandler_(session_),
       publisher_(bus_, session_),
-      ratingUpdater_(bus_, players_, accounts) {
+      ownedHistoryStore_(std::make_unique<NoOpGameHistoryStore>()), historyStore_(*ownedHistoryStore_),
+      ratingUpdater_(bus_, players_, accounts, historyStore_),
+      natsEventMirror_(bus_, natsPublisher) {
+    players_.setOnDisconnect([this](char color, long long graceMs) { session_.playerDisconnected(color, graceMs); });
+    players_.setOnReconnect([this](char color) { session_.playerReconnected(color); });
+}
+
+GameMatch::GameMatch(Board startingBoard, PlayerAccountStore& accounts, NatsPublisher& natsPublisher, GameHistoryStore& historyStore)
+    : gameState_(std::move(startingBoard)),
+      session_(gameState_, bus_),
+      commandHandler_(session_),
+      publisher_(bus_, session_),
+      historyStore_(historyStore),
+      ratingUpdater_(bus_, players_, accounts, historyStore_),
+      natsEventMirror_(bus_, natsPublisher) {
     players_.setOnDisconnect([this](char color, long long graceMs) { session_.playerDisconnected(color, graceMs); });
     players_.setOnReconnect([this](char color) { session_.playerReconnected(color); });
 }

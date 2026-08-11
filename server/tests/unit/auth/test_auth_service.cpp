@@ -1,6 +1,7 @@
 #include "../../catch2/catch_amalgamated.hpp"
 #include "../../../auth/auth_service.hpp"
 #include "../../../db/sqlite_player_account_store.hpp"
+#include "../../../matches/game_registry.hpp"
 
 TEST_CASE("AuthService::login creates a new account on first login") {
     SqlitePlayerAccountStore accounts(":memory:");

@@ -5,10 +5,17 @@ services:
       POSTGRES_USER: kungfuchess
       POSTGRES_PASSWORD: devpassword
       POSTGRES_DB: kungfuchess
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
     ports:
       - "5432:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U kungfuchess"]
+      # -h 127.0.0.1 forces a real TCP check (same path apps use). Without it,
+      # pg_isready connects over the local Unix socket, which the *temporary*
+      # server Postgres runs during first-time init already answers on --
+      # before the real server is listening on TCP -- causing depends_on to
+      # release ws-gateway/api-gateway into a "Connection refused" window.
+      test: ["CMD-SHELL", "pg_isready -U kungfuchess -h 127.0.0.1"]
       interval: 2s
       timeout: 3s
       retries: 10
@@ -23,12 +30,151 @@ services:
       timeout: 3s
       retries: 10
 
+  nats:
+    image: nats:2-alpine
+    command: ["-m", "8222"]
+    ports:
+      - "4222:4222"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O-", "http://localhost:8222/varz"]
+      interval: 2s
+      timeout: 3s
+      retries: 10
+
   tests:
     build:
       context: .
       dockerfile: server/Dockerfile
+    image: ctd-server:latest
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
+      nats:
+        condition: service_healthy
+      ws-gateway:
+        condition: service_healthy
+      matchmaker:
+        condition: service_healthy
+      api-gateway:
+        condition: service_healthy
+
+  # Phase 5 process split -- three real running services, not just tests.
+  # matchmaker/ws-gateway reach each other over the internal Docker network by
+  # service name (no ports: mapping needed for that -- only host-facing ports
+  # are exposed below). Neither depends_on the other: both HTTP clients are
+  # best-effort (log-and-continue on failure, same as NatsPublisher), so
+  # there's no real startup-order requirement between them.
+  matchmaker:
+    build:
+      context: .
+      dockerfile: server/Dockerfile
+    image: ctd-server:latest
+    command: ["/src/build/MatchmakerServer"]
+    environment:
+      WS_GATEWAY_HOST: ws-gateway
+      WS_GATEWAY_INTERNAL_PORT: "8082"
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      LOG_DIR: /logs
+    volumes:
+      - server_logs:/logs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8083/health"]
+      interval: 2s
+      timeout: 3s
+      retries: 10
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  # ws-gateway/api-gateway both use PostgresPlayerAccountStore now (HAS_POSTGRES,
+  # since the image is built on Linux with libpqxx available -- see
+  # CMakeLists.txt) instead of SQLite, so they no longer need to share a
+  # players.db file via a volume: Postgres itself is the shared, durable store.
+  ws-gateway:
+    build:
+      context: .
+      dockerfile: server/Dockerfile
+    image: ctd-server:latest
+    command: ["/src/build/WsGateway"]
+    volumes:
+      - server_logs:/logs
+    environment:
+      MATCHMAKER_HOST: matchmaker
+      MATCHMAKER_PORT: "8083"
+      NATS_URL: "nats://nats:4222"
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB: kungfuchess
+      POSTGRES_USER: kungfuchess
+      POSTGRES_PASSWORD: devpassword
+      LOG_DIR: /logs
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8082/health"]
+      interval: 2s
+      timeout: 3s
+      retries: 10
+    depends_on:
+      nats:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+
+  api-gateway:
+    build:
+      context: .
+      dockerfile: server/Dockerfile
+    image: ctd-server:latest
+    command: ["/src/build/ApiGateway"]
+    volumes:
+      - server_logs:/logs
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB: kungfuchess
+      POSTGRES_USER: kungfuchess
+      POSTGRES_PASSWORD: devpassword
+      WS_GATEWAY_HOST: ws-gateway
+      WS_GATEWAY_INTERNAL_PORT: "8082"
+      LOG_DIR: /logs
+    ports:
+      - "8081:8081"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/health"]
+      interval: 2s
+      timeout: 3s
+      retries: 10
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # Phase 7 -- centralized logs. Promtail tails every process's log file off
+  # the shared server_logs volume (LOG_DIR above) and ships them to Loki;
+  # query by {job="ctd-server", filename="/logs/<name>.log"} instead of
+  # tailing a container-local file one at a time.
+  loki:
+    image: grafana/loki:2.9.0
+    ports:
+      - "3100:3100"
+    command: -config.file=/etc/loki/local-config.yaml
+
+  promtail:
+    image: grafana/promtail:2.9.0
+    volumes:
+      - ./promtail-config.yml:/etc/promtail/config.yml:ro
+      - server_logs:/logs:ro
+    command: -config.file=/etc/promtail/config.yml
+    depends_on:
+      - loki
+
+volumes:
+  server_logs:
+  postgres_data:

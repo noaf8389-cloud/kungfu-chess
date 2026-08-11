@@ -1,0 +1,81 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ws-gateway
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ws-gateway
+  template:
+    metadata:
+      labels:
+        app: ws-gateway
+    spec:
+      # See matchmaker.yaml: WsGateway already throws/exits if a dependency
+      # isn't reachable, so restartPolicy: Always covers the ordering.
+      containers:
+        - name: ws-gateway
+          image: ctd-server:latest
+          imagePullPolicy: IfNotPresent
+          command: ["/src/build/WsGateway"]
+          envFrom:
+            - configMapRef:
+                name: ctd-config
+          env:
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: ctd-secrets
+                  key: POSTGRES_PASSWORD
+          ports:
+            - containerPort: 8080
+            - containerPort: 8082
+          volumeMounts:
+            - name: logs
+              mountPath: /logs
+          # Probes hit the internal API port (8082), matching
+          # docker-compose.yml -- not the client-facing WS port (8080).
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8082
+            initialDelaySeconds: 5
+            periodSeconds: 2
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8082
+            initialDelaySeconds: 10
+            periodSeconds: 10
+        - name: promtail
+          image: grafana/promtail:2.9.0
+          args: ["-config.file=/etc/promtail/config.yml"]
+          volumeMounts:
+            - name: logs
+              mountPath: /logs
+              readOnly: true
+            - name: promtail-config
+              mountPath: /etc/promtail
+      volumes:
+        - name: logs
+          emptyDir: {}
+        - name: promtail-config
+          configMap:
+            name: promtail-sidecar-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ws-gateway
+spec:
+  selector:
+    app: ws-gateway
+  type: LoadBalancer
+  ports:
+    - name: ws
+      port: 8080
+      targetPort: 8080
+    - name: internal
+      port: 8082
+      targetPort: 8082

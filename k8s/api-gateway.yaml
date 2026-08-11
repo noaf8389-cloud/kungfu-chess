@@ -1,0 +1,74 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api-gateway
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: api-gateway
+  template:
+    metadata:
+      labels:
+        app: api-gateway
+    spec:
+      # See matchmaker.yaml: ApiGateway already throws/exits if Postgres isn't
+      # reachable, so restartPolicy: Always covers the ordering.
+      containers:
+        - name: api-gateway
+          image: ctd-server:latest
+          imagePullPolicy: IfNotPresent
+          command: ["/src/build/ApiGateway"]
+          envFrom:
+            - configMapRef:
+                name: ctd-config
+          env:
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: ctd-secrets
+                  key: POSTGRES_PASSWORD
+          ports:
+            - containerPort: 8081
+          volumeMounts:
+            - name: logs
+              mountPath: /logs
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8081
+            initialDelaySeconds: 5
+            periodSeconds: 2
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8081
+            initialDelaySeconds: 10
+            periodSeconds: 10
+        - name: promtail
+          image: grafana/promtail:2.9.0
+          args: ["-config.file=/etc/promtail/config.yml"]
+          volumeMounts:
+            - name: logs
+              mountPath: /logs
+              readOnly: true
+            - name: promtail-config
+              mountPath: /etc/promtail
+      volumes:
+        - name: logs
+          emptyDir: {}
+        - name: promtail-config
+          configMap:
+            name: promtail-sidecar-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: api-gateway
+spec:
+  selector:
+    app: api-gateway
+  type: LoadBalancer
+  ports:
+    - port: 8081
+      targetPort: 8081

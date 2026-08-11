@@ -7,8 +7,12 @@
 
 #include "player_account_store.hpp"
 
-// PostgreSQL-backed implementation of PlayerAccountStore, for the cloud deployment.
-// SqlitePlayerAccountStore remains the implementation used for local dev / Docker Compose.
+// PostgreSQL-backed implementation of PlayerAccountStore. Used by ApiGateway/
+// WsGateway whenever libpqxx is available (HAS_POSTGRES, see CMakeLists.txt) --
+// today that means Docker Compose (Linux), where the real postgres service is
+// reachable. SqlitePlayerAccountStore remains the native-Windows fallback
+// (libpqxx isn't installable there via vcpkg -- see Implementation_Roadmap.md
+// Phase 2 Decision Log) and KungFuChessServer's own single-process path.
 class PostgresPlayerAccountStore : public PlayerAccountStore {
 public:
     /// connectionString is a libpq connection string, e.g.

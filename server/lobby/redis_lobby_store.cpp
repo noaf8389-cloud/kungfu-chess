@@ -47,6 +47,7 @@ RedisLobbyStore::RedisLobbyStore(const std::string& host, int port) {
 RedisLobbyStore::~RedisLobbyStore() = default;
 
 LobbyStore::ConnectionId RedisLobbyStore::nextConnectionId() {
+    std::lock_guard<std::mutex> lock(mutex_);
     ReplyGuard reply(redisCommand(context_.get(), "INCR lobby:next_id"));
     if (!reply.get() || reply->type != REDIS_REPLY_INTEGER) {
         throw std::runtime_error("RedisLobbyStore::nextConnectionId: unexpected reply from INCR");
@@ -55,11 +56,13 @@ LobbyStore::ConnectionId RedisLobbyStore::nextConnectionId() {
 }
 
 void RedisLobbyStore::addConnection(ConnectionId id) {
+    std::lock_guard<std::mutex> lock(mutex_);
     std::string idStr = std::to_string(id);
     ReplyGuard reply(redisCommand(context_.get(), "SADD %s %s", connectionsKey().c_str(), idStr.c_str()));
 }
 
 void RedisLobbyStore::removeConnection(ConnectionId id) {
+    std::lock_guard<std::mutex> lock(mutex_);
     std::string idStr = std::to_string(id);
     ReplyGuard removeMembership(
         redisCommand(context_.get(), "SREM %s %s", connectionsKey().c_str(), idStr.c_str()));
@@ -67,12 +70,14 @@ void RedisLobbyStore::removeConnection(ConnectionId id) {
 }
 
 bool RedisLobbyStore::hasConnection(ConnectionId id) const {
+    std::lock_guard<std::mutex> lock(mutex_);
     std::string idStr = std::to_string(id);
     ReplyGuard reply(redisCommand(context_.get(), "SISMEMBER %s %s", connectionsKey().c_str(), idStr.c_str()));
     return reply.get() && reply->type == REDIS_REPLY_INTEGER && reply->integer != 0;
 }
 
 void RedisLobbyStore::setIdentity(ConnectionId id, const std::string& username, int rating) {
+    std::lock_guard<std::mutex> lock(mutex_);
     std::string key = identityKey(id);
     std::string ratingStr = std::to_string(rating);
     ReplyGuard reply(redisCommand(context_.get(), "HSET %s username %s rating %s",
@@ -80,6 +85,7 @@ void RedisLobbyStore::setIdentity(ConnectionId id, const std::string& username, 
 }
 
 std::optional<LobbyStore::Identity> RedisLobbyStore::identityFor(ConnectionId id) const {
+    std::lock_guard<std::mutex> lock(mutex_);
     std::string key = identityKey(id);
 
     ReplyGuard usernameReply(redisCommand(context_.get(), "HGET %s username", key.c_str()));

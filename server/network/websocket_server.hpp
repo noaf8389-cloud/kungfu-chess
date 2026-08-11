@@ -10,10 +10,12 @@
 
 #include "../auth/auth_service.hpp"
 #include "../lobby/lobby_registry.hpp"
-#include "../lobby/matchmaker.hpp"
-#include "../matches/game_registry.hpp"
+#include "../lobby/match_queue.hpp"
+#include "../matches/game_allocator.hpp"
+#include "../matches/shard_lookup.hpp"
 #include "../db/player_account_store.hpp"
 #include "../player_registry.hpp"
+#include "../rooms/rooms_service.hpp"
 
 class GameMatch;
 struct LoginRequest;
@@ -22,8 +24,8 @@ struct JoinRoomRequest;
 class GameWebSocketServer {
 public:
     /// Creates and configures the WebSocket server.
-    GameWebSocketServer(int port, LobbyRegistry& lobbyRegistry, GameRegistry& gameRegistry,
-                  Matchmaker& matchmaker, PlayerAccountStore& accounts, Board templateBoard);
+    GameWebSocketServer(int port, LobbyRegistry& lobbyRegistry, ShardLookup& gameRegistry, GameAllocator& gameAllocator,
+                  MatchQueue& matchQueue, PlayerAccountStore& accounts, Board templateBoard);
 
     /// Starts listening for incoming WebSocket connections.
     bool start();
@@ -52,11 +54,12 @@ private:
     void attachToMatch(ConnectionState& state, GameMatch* match, bool isResume);
 
     LobbyRegistry& lobbyRegistry_;
-    GameRegistry& gameRegistry_;
-    Matchmaker& matchmaker_;
+    ShardLookup& gameRegistry_;
+    MatchQueue& matchQueue_;
     PlayerAccountStore& accounts_;
     Board templateBoard_;
     AuthService authService_;
+    RoomsService roomsService_;
 
     std::mutex connectionsMutex_;
     std::unordered_map<ix::WebSocket*, std::shared_ptr<ConnectionState>> connections_;

@@ -27,7 +27,8 @@ namespace {
 TEST_CASE("enqueue adds a player to the waiting queue") {
     FakeAccountStore accounts;
     GameRegistry registry;
-    Matchmaker matchmaker(registry, accounts, makeBoard());
+    GameAllocator allocator(registry);
+    Matchmaker matchmaker(allocator, accounts, makeBoard());
 
     matchmaker.enqueue("alice", 1200);
 
@@ -37,7 +38,8 @@ TEST_CASE("enqueue adds a player to the waiting queue") {
 TEST_CASE("enqueue does nothing if the same username is already waiting") {
     FakeAccountStore accounts;
     GameRegistry registry;
-    Matchmaker matchmaker(registry, accounts, makeBoard());
+    GameAllocator allocator(registry);
+    Matchmaker matchmaker(allocator, accounts, makeBoard());
 
     matchmaker.enqueue("alice", 1200);
     matchmaker.enqueue("alice", 1500);
@@ -48,7 +50,8 @@ TEST_CASE("enqueue does nothing if the same username is already waiting") {
 TEST_CASE("dequeue removes a waiting player") {
     FakeAccountStore accounts;
     GameRegistry registry;
-    Matchmaker matchmaker(registry, accounts, makeBoard());
+    GameAllocator allocator(registry);
+    Matchmaker matchmaker(allocator, accounts, makeBoard());
     matchmaker.enqueue("alice", 1200);
 
     matchmaker.dequeue("alice");
@@ -59,7 +62,8 @@ TEST_CASE("dequeue removes a waiting player") {
 TEST_CASE("dequeuing a username that isn't waiting does nothing") {
     FakeAccountStore accounts;
     GameRegistry registry;
-    Matchmaker matchmaker(registry, accounts, makeBoard());
+    GameAllocator allocator(registry);
+    Matchmaker matchmaker(allocator, accounts, makeBoard());
 
     REQUIRE_NOTHROW(matchmaker.dequeue("ghost"));
 }
@@ -67,7 +71,8 @@ TEST_CASE("dequeuing a username that isn't waiting does nothing") {
 TEST_CASE("tick matches two players within the rating range and removes them from the queue") {
     FakeAccountStore accounts;
     GameRegistry registry;
-    Matchmaker matchmaker(registry, accounts, makeBoard());
+    GameAllocator allocator(registry);
+    Matchmaker matchmaker(allocator, accounts, makeBoard());
     matchmaker.enqueue("alice", 1200);
     matchmaker.enqueue("bob", 1250);
 
@@ -79,7 +84,8 @@ TEST_CASE("tick matches two players within the rating range and removes them fro
 TEST_CASE("tick actually creates the match via GameRegistry") {
     FakeAccountStore accounts;
     GameRegistry registry;
-    Matchmaker matchmaker(registry, accounts, makeBoard());
+    GameAllocator allocator(registry);
+    Matchmaker matchmaker(allocator, accounts, makeBoard());
     matchmaker.enqueue("alice", 1200);
     matchmaker.enqueue("bob", 1250);
 
@@ -92,7 +98,8 @@ TEST_CASE("tick actually creates the match via GameRegistry") {
 TEST_CASE("tick does not match two players outside the rating range") {
     FakeAccountStore accounts;
     GameRegistry registry;
-    Matchmaker matchmaker(registry, accounts, makeBoard());
+    GameAllocator allocator(registry);
+    Matchmaker matchmaker(allocator, accounts, makeBoard());
     matchmaker.enqueue("alice", 1200);
     matchmaker.enqueue("bob", 1400);
 
@@ -105,7 +112,8 @@ TEST_CASE("tick does not match two players outside the rating range") {
 TEST_CASE("tick matches a pair exactly at the edge of the rating range") {
     FakeAccountStore accounts;
     GameRegistry registry;
-    Matchmaker matchmaker(registry, accounts, makeBoard());
+    GameAllocator allocator(registry);
+    Matchmaker matchmaker(allocator, accounts, makeBoard());
     matchmaker.enqueue("alice", 1200);
     matchmaker.enqueue("bob", 1300);   // exactly 100 apart
 
@@ -117,7 +125,8 @@ TEST_CASE("tick matches a pair exactly at the edge of the rating range") {
 TEST_CASE("tick can form multiple independent pairs in the same call") {
     FakeAccountStore accounts;
     GameRegistry registry;
-    Matchmaker matchmaker(registry, accounts, makeBoard());
+    GameAllocator allocator(registry);
+    Matchmaker matchmaker(allocator, accounts, makeBoard());
     matchmaker.enqueue("alice", 1200);
     matchmaker.enqueue("bob", 1250);
     matchmaker.enqueue("carol", 1800);
@@ -132,7 +141,8 @@ TEST_CASE("tick can form multiple independent pairs in the same call") {
 TEST_CASE("a player who has waited past the timeout without a match fires onNoMatchFound") {
     FakeAccountStore accounts;
     GameRegistry registry;
-    Matchmaker matchmaker(registry, accounts, makeBoard(), /*timeoutMs=*/1);
+    GameAllocator allocator(registry);
+    Matchmaker matchmaker(allocator, accounts, makeBoard(), /*timeoutMs=*/1);
     matchmaker.enqueue("alice", 1200);
 
     std::string notified;
@@ -148,7 +158,8 @@ TEST_CASE("a player who has waited past the timeout without a match fires onNoMa
 TEST_CASE("a player matched before the timeout does not fire onNoMatchFound") {
     FakeAccountStore accounts;
     GameRegistry registry;
-    Matchmaker matchmaker(registry, accounts, makeBoard(), /*timeoutMs=*/60000);
+    GameAllocator allocator(registry);
+    Matchmaker matchmaker(allocator, accounts, makeBoard(), /*timeoutMs=*/60000);
     matchmaker.enqueue("alice", 1200);
     matchmaker.enqueue("bob", 1250);
 
@@ -163,7 +174,8 @@ TEST_CASE("a player matched before the timeout does not fire onNoMatchFound") {
 TEST_CASE("onNoMatchFound does not fire for a player still within the timeout window") {
     FakeAccountStore accounts;
     GameRegistry registry;
-    Matchmaker matchmaker(registry, accounts, makeBoard(), /*timeoutMs=*/60000);
+    GameAllocator allocator(registry);
+    Matchmaker matchmaker(allocator, accounts, makeBoard(), /*timeoutMs=*/60000);
     matchmaker.enqueue("alice", 1200);
 
     bool called = false;
@@ -178,7 +190,8 @@ TEST_CASE("onNoMatchFound does not fire for a player still within the timeout wi
 TEST_CASE("a timeout eviction with no handler set does not crash") {
     FakeAccountStore accounts;
     GameRegistry registry;
-    Matchmaker matchmaker(registry, accounts, makeBoard(), /*timeoutMs=*/1);
+    GameAllocator allocator(registry);
+    Matchmaker matchmaker(allocator, accounts, makeBoard(), /*timeoutMs=*/1);
     matchmaker.enqueue("alice", 1200);
 
     std::this_thread::sleep_for(std::chrono::milliseconds(5));

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <mutex>
 #include <string>
 
 #include "lobby_store.hpp"
@@ -33,4 +34,9 @@ private:
     };
 
     std::unique_ptr<redisContext, ContextDeleter> context_;
+    // Guards context_: a single hiredis redisContext isn't safe for concurrent
+    // use from multiple threads (same reasoning as RedisGameIndexStore /
+    // RedisMatchmakerQueueStore) -- and unlike when this class was written,
+    // LobbyRegistry no longer serializes callers on its own.
+    mutable std::mutex mutex_;
 };

@@ -4,7 +4,7 @@
 
 #include "../db/player_account_store.hpp"
 #include "../lobby/lobby_registry.hpp"
-#include "../matches/game_registry.hpp"
+#include "../matches/shard_lookup.hpp"
 
 class GameMatch;
 
@@ -18,7 +18,7 @@ struct AuthResult {
 class AuthService {
 public:
     /// accounts/lobbyRegistry/gameRegistry must outlive this AuthService; it only stores references to them.
-    AuthService(PlayerAccountStore& accounts, LobbyRegistry& lobbyRegistry, GameRegistry& gameRegistry);
+    AuthService(PlayerAccountStore& accounts, LobbyRegistry& lobbyRegistry, ShardLookup& gameRegistry);
 
     /// Call once per login attempt (existing account or first-time signup — both go through this same call).
     /// lobbyId identifies the connection attempting to log in, so its identity can be recorded even before
@@ -29,5 +29,5 @@ public:
 private:
     PlayerAccountStore& accounts_;
     LobbyRegistry& lobbyRegistry_;
-    GameRegistry& gameRegistry_;
+    ShardLookup& gameRegistry_;
 };

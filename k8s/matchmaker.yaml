@@ -1,0 +1,70 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: matchmaker
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: matchmaker
+  template:
+    metadata:
+      labels:
+        app: matchmaker
+    spec:
+      # Kubernetes has no docker-compose-style depends_on/service_healthy.
+      # MatchmakerServer already throws and exits if Redis isn't reachable at
+      # startup (same as every other required store in this codebase) --
+      # restartPolicy: Always (the default) retries with backoff until Redis
+      # is up, which is enough ordering guarantee without an extra sidecar image.
+      containers:
+        - name: matchmaker
+          image: ctd-server:latest
+          imagePullPolicy: IfNotPresent
+          command: ["/src/build/MatchmakerServer"]
+          envFrom:
+            - configMapRef:
+                name: ctd-config
+          ports:
+            - containerPort: 8083
+          volumeMounts:
+            - name: logs
+              mountPath: /logs
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8083
+            initialDelaySeconds: 5
+            periodSeconds: 2
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8083
+            initialDelaySeconds: 10
+            periodSeconds: 10
+        - name: promtail
+          image: grafana/promtail:2.9.0
+          args: ["-config.file=/etc/promtail/config.yml"]
+          volumeMounts:
+            - name: logs
+              mountPath: /logs
+              readOnly: true
+            - name: promtail-config
+              mountPath: /etc/promtail
+      volumes:
+        - name: logs
+          emptyDir: {}
+        - name: promtail-config
+          configMap:
+            name: promtail-sidecar-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: matchmaker
+spec:
+  selector:
+    app: matchmaker
+  ports:
+    - port: 8083
+      targetPort: 8083

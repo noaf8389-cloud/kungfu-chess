@@ -20,15 +20,19 @@ PostgresPlayerAccountStore::~PostgresPlayerAccountStore() = default;
 
 void PostgresPlayerAccountStore::createTableIfMissing() {
     std::lock_guard<std::mutex> lock(mutex_);
-    pqxx::work txn(*connection_);
-    txn.exec(
-        "CREATE TABLE IF NOT EXISTS players ("
-        "  username TEXT PRIMARY KEY,"
-        "  salt TEXT NOT NULL,"
-        "  password_hash TEXT NOT NULL,"
-        "  rating INTEGER NOT NULL DEFAULT 1200"
-        ");");
-    txn.commit();
+    try {
+        pqxx::work txn(*connection_);
+        txn.exec(
+            "CREATE TABLE IF NOT EXISTS players ("
+            "  username TEXT PRIMARY KEY,"
+            "  salt TEXT NOT NULL,"
+            "  password_hash TEXT NOT NULL,"
+            "  rating INTEGER NOT NULL DEFAULT 1200"
+            ");");
+        txn.commit();
+    } catch (const pqxx::unique_violation&) {
+        // Same benign race as PostgresGameHistoryStore::createTableIfMissing.
+    }
 }
 
 LoginResult PostgresPlayerAccountStore::loginOrRegister(const std::string& username, const std::string& password) {

@@ -59,3 +59,15 @@ inline void from_json(const json& j, PlayerReconnectedEvent& e) {
     e.color = j.at("color").get<std::string>().at(0);
     j.at("timestamp_ms").get_to(e.timestamp_ms);
 }
+
+// The single place every event-to-wire-format conversion goes through — whoever
+// needs to serialize an event for sending (WebSocket broadcast, NATS mirror, ...)
+// calls this instead of building its own {"type", "payload"} shape. If an event's
+// structure changes, only its to_json above needs updating.
+template <typename EventT>
+std::string toEnvelopeJson(const char* typeName, const EventT& event) {
+    json j;
+    j["type"] = typeName;
+    j["payload"] = event;
+    return j.dump();
+}

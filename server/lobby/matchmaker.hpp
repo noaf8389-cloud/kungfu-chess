@@ -3,11 +3,14 @@
 #include <chrono>
 #include <cstddef>
 #include <functional>
+#include <memory>
 #include <mutex>
 #include <string>
 #include <vector>
 
-#include "matches/game_registry.hpp"
+#include "matches/game_allocator.hpp"
+#include "matches/match_creator.hpp"
+#include "matchmaker_queue_store.hpp"
 #include "db/player_account_store.hpp"
 #include "logic/model/game_state.hpp"
 
@@ -18,10 +21,15 @@ public:
 
     static constexpr long long kDefaultTimeoutMs = 60000;
 
-    // Builds a Matchmaker bound to a shared GameRegistry, account store, and the
-    // board template used for every match it creates.
-    Matchmaker(GameRegistry& gameRegistry, PlayerAccountStore& accounts, Board startingBoard,
+    // Default: owns its own InMemoryMatchCreator and InMemoryMatchmakerQueueStore
+    // -- today's behavior unchanged; used throughout tests and by KungFuChessServer.
+    Matchmaker(GameAllocator& gameAllocator, PlayerAccountStore& accounts, Board startingBoard,
                long long timeoutMs = kDefaultTimeoutMs);
+    // Injected MatchCreator; still owns its own in-memory queue store.
+    explicit Matchmaker(MatchCreator& matchCreator, long long timeoutMs = kDefaultTimeoutMs);
+    // Both injected -- used by MatchmakerServer (Phase 5) with HttpMatchCreator +
+    // RedisMatchmakerQueueStore.
+    Matchmaker(MatchCreator& matchCreator, MatchmakerQueueStore& queueStore, long long timeoutMs = kDefaultTimeoutMs);
 
     // Adds a player to the waiting queue by rating; ignored if already waiting.
     void enqueue(const std::string& username, int rating);
@@ -39,19 +47,13 @@ public:
     std::size_t waitingCount() const;
 
 private:
-    struct WaitingPlayer {
-        std::string username;
-        int rating;
-        std::chrono::steady_clock::time_point joinedAt;
-    };
-
     static constexpr int kRatingRange = 100;
 
     mutable std::mutex mutex_;
-    GameRegistry& gameRegistry_;
-    PlayerAccountStore& accounts_;
-    Board startingBoard_;
+    std::unique_ptr<MatchCreator> ownedMatchCreator_;
+    MatchCreator& matchCreator_;
+    std::unique_ptr<MatchmakerQueueStore> ownedQueueStore_;
+    MatchmakerQueueStore& queueStore_;
     long long timeoutMs_;
-    std::vector<WaitingPlayer> waiting_;
     NoMatchFoundHandler onNoMatchFound_;
 };

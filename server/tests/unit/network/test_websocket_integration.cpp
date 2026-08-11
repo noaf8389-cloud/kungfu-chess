@@ -11,6 +11,7 @@
 #include <ixwebsocket/IXNetSystem.h>
 #include <ixwebsocket/IXWebSocket.h>
 
+#include "../../../lobby/in_memory_match_queue.hpp"
 #include "../../../lobby/lobby_registry.hpp"
 #include "../../../lobby/matchmaker.hpp"
 #include "../../../matches/game_registry.hpp"
@@ -44,10 +45,12 @@ TEST_CASE("two clients log in, get matched, and a click broadcasts to both over 
     SqlitePlayerAccountStore accounts(":memory:");
     LobbyRegistry lobbyRegistry;
     GameRegistry gameRegistry;
-    Matchmaker matchmaker(gameRegistry, accounts, board);
+    GameAllocator gameAllocator(gameRegistry);
+    Matchmaker matchmaker(gameAllocator, accounts, board);
+    InMemoryMatchQueue matchQueue(matchmaker);
 
     const int port = 8901;
-    GameWebSocketServer server(port, lobbyRegistry, gameRegistry, matchmaker, accounts, board);
+    GameWebSocketServer server(port, lobbyRegistry, gameRegistry, gameAllocator, matchQueue, accounts, board);
     REQUIRE(server.start());
 
     std::atomic<bool> stopTicking{false};
@@ -120,10 +123,12 @@ TEST_CASE("a client that reconnects with the same username is routed back into t
     SqlitePlayerAccountStore accounts(":memory:");
     LobbyRegistry lobbyRegistry;
     GameRegistry gameRegistry;
-    Matchmaker matchmaker(gameRegistry, accounts, board);
+    GameAllocator gameAllocator(gameRegistry);
+    Matchmaker matchmaker(gameAllocator, accounts, board);
+    InMemoryMatchQueue matchQueue(matchmaker);
 
     const int port = 8903;
-    GameWebSocketServer server(port, lobbyRegistry, gameRegistry, matchmaker, accounts, board);
+    GameWebSocketServer server(port, lobbyRegistry, gameRegistry, gameAllocator, matchQueue, accounts, board);
     REQUIRE(server.start());
 
     std::atomic<bool> stopTicking{false};
@@ -207,10 +212,12 @@ TEST_CASE("a client with no matching rating partner receives NoMatchFoundEvent a
     SqlitePlayerAccountStore accounts(":memory:");
     LobbyRegistry lobbyRegistry;
     GameRegistry gameRegistry;
-    Matchmaker matchmaker(gameRegistry, accounts, board, /*timeoutMs=*/50);
+    GameAllocator gameAllocator(gameRegistry);
+    Matchmaker matchmaker(gameAllocator, accounts, board, /*timeoutMs=*/50);
+    InMemoryMatchQueue matchQueue(matchmaker);
 
     const int port = 8904;
-    GameWebSocketServer server(port, lobbyRegistry, gameRegistry, matchmaker, accounts, board);
+    GameWebSocketServer server(port, lobbyRegistry, gameRegistry, gameAllocator, matchQueue, accounts, board);
     REQUIRE(server.start());
 
     std::atomic<bool> stopTicking{false};
@@ -256,10 +263,12 @@ TEST_CASE("a client that creates a room receives a RoomCreatedEvent with a room 
     SqlitePlayerAccountStore accounts(":memory:");
     LobbyRegistry lobbyRegistry;
     GameRegistry gameRegistry;
-    Matchmaker matchmaker(gameRegistry, accounts, board);
+    GameAllocator gameAllocator(gameRegistry);
+    Matchmaker matchmaker(gameAllocator, accounts, board);
+    InMemoryMatchQueue matchQueue(matchmaker);
 
     const int port = 8905;
-    GameWebSocketServer server(port, lobbyRegistry, gameRegistry, matchmaker, accounts, board);
+    GameWebSocketServer server(port, lobbyRegistry, gameRegistry, gameAllocator, matchQueue, accounts, board);
     REQUIRE(server.start());
 
     std::atomic<bool> stopTicking{false};
@@ -305,10 +314,12 @@ TEST_CASE("a second client that joins an existing room by code gets matched with
     SqlitePlayerAccountStore accounts(":memory:");
     LobbyRegistry lobbyRegistry;
     GameRegistry gameRegistry;
-    Matchmaker matchmaker(gameRegistry, accounts, board);
+    GameAllocator gameAllocator(gameRegistry);
+    Matchmaker matchmaker(gameAllocator, accounts, board);
+    InMemoryMatchQueue matchQueue(matchmaker);
 
     const int port = 8906;
-    GameWebSocketServer server(port, lobbyRegistry, gameRegistry, matchmaker, accounts, board);
+    GameWebSocketServer server(port, lobbyRegistry, gameRegistry, gameAllocator, matchQueue, accounts, board);
     REQUIRE(server.start());
 
     std::atomic<bool> stopTicking{false};
@@ -385,10 +396,12 @@ TEST_CASE("joining with an unknown room code receives a JoinRoomFailedEvent") {
     SqlitePlayerAccountStore accounts(":memory:");
     LobbyRegistry lobbyRegistry;
     GameRegistry gameRegistry;
-    Matchmaker matchmaker(gameRegistry, accounts, board);
+    GameAllocator gameAllocator(gameRegistry);
+    Matchmaker matchmaker(gameAllocator, accounts, board);
+    InMemoryMatchQueue matchQueue(matchmaker);
 
     const int port = 8907;
-    GameWebSocketServer server(port, lobbyRegistry, gameRegistry, matchmaker, accounts, board);
+    GameWebSocketServer server(port, lobbyRegistry, gameRegistry, gameAllocator, matchQueue, accounts, board);
     REQUIRE(server.start());
 
     std::atomic<bool> stopTicking{false};
@@ -434,10 +447,12 @@ TEST_CASE("creating a room after findMatch removes the player from the matchmaki
     SqlitePlayerAccountStore accounts(":memory:");
     LobbyRegistry lobbyRegistry;
     GameRegistry gameRegistry;
-    Matchmaker matchmaker(gameRegistry, accounts, board, /*timeoutMs=*/50);
+    GameAllocator gameAllocator(gameRegistry);
+    Matchmaker matchmaker(gameAllocator, accounts, board, /*timeoutMs=*/50);
+    InMemoryMatchQueue matchQueue(matchmaker);
 
     const int port = 8908;
-    GameWebSocketServer server(port, lobbyRegistry, gameRegistry, matchmaker, accounts, board);
+    GameWebSocketServer server(port, lobbyRegistry, gameRegistry, gameAllocator, matchQueue, accounts, board);
     REQUIRE(server.start());
 
     std::atomic<bool> stopTicking{false};
@@ -508,10 +523,12 @@ TEST_CASE("a client that reconnects into a room-created match is routed back int
     SqlitePlayerAccountStore accounts(":memory:");
     LobbyRegistry lobbyRegistry;
     GameRegistry gameRegistry;
-    Matchmaker matchmaker(gameRegistry, accounts, board);
+    GameAllocator gameAllocator(gameRegistry);
+    Matchmaker matchmaker(gameAllocator, accounts, board);
+    InMemoryMatchQueue matchQueue(matchmaker);
 
     const int port = 8909;
-    GameWebSocketServer server(port, lobbyRegistry, gameRegistry, matchmaker, accounts, board);
+    GameWebSocketServer server(port, lobbyRegistry, gameRegistry, gameAllocator, matchQueue, accounts, board);
     REQUIRE(server.start());
 
     std::atomic<bool> stopTicking{false};
@@ -607,10 +624,12 @@ TEST_CASE("sending createRoom again while already in a match is a no-op") {
     SqlitePlayerAccountStore accounts(":memory:");
     LobbyRegistry lobbyRegistry;
     GameRegistry gameRegistry;
-    Matchmaker matchmaker(gameRegistry, accounts, board);
+    GameAllocator gameAllocator(gameRegistry);
+    Matchmaker matchmaker(gameAllocator, accounts, board);
+    InMemoryMatchQueue matchQueue(matchmaker);
 
     const int port = 8910;
-    GameWebSocketServer server(port, lobbyRegistry, gameRegistry, matchmaker, accounts, board);
+    GameWebSocketServer server(port, lobbyRegistry, gameRegistry, gameAllocator, matchQueue, accounts, board);
     REQUIRE(server.start());
 
     std::atomic<bool> stopTicking{false};

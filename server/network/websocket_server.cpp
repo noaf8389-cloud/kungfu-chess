@@ -16,14 +16,15 @@ namespace {
     constexpr long long kDisconnectGraceMs = 20000;
 }
 
-GameWebSocketServer::GameWebSocketServer(int port, LobbyRegistry& lobbyRegistry, GameRegistry& gameRegistry,
-                                  Matchmaker& matchmaker, PlayerAccountStore& accounts, Board templateBoard)
+GameWebSocketServer::GameWebSocketServer(int port, LobbyRegistry& lobbyRegistry, ShardLookup& gameRegistry, GameAllocator& gameAllocator,
+                                  MatchQueue& matchQueue, PlayerAccountStore& accounts, Board templateBoard)
     : lobbyRegistry_(lobbyRegistry), gameRegistry_(gameRegistry),
-      matchmaker_(matchmaker), accounts_(accounts), templateBoard_(std::move(templateBoard)),
+      matchQueue_(matchQueue), accounts_(accounts), templateBoard_(std::move(templateBoard)),
       authService_(accounts, lobbyRegistry, gameRegistry),
+      roomsService_(gameRegistry, gameAllocator, accounts, matchQueue, templateBoard_),
       server_(port, "0.0.0.0") {
 
-    matchmaker_.setOnNoMatchFound([this](const std::string& username) {
+    matchQueue_.setOnNoMatchFound([this](const std::string& username) {
         ix::WebSocket* socket = nullptr;
         {
             std::lock_guard<std::mutex> lock(connectionsMutex_);
@@ -134,41 +135,39 @@ void GameWebSocketServer::handleLogin(ix::WebSocket* rawConnection, ConnectionSt
 void GameWebSocketServer::handleCreateRoom(ConnectionState& state) {
     if (!state.username.has_value() || state.match != nullptr) return;
 
-    matchmaker_.dequeue(*state.username);
     waitingByUsername_.erase(*state.username);
 
-    GameRegistry::RoomCode code = gameRegistry_.createRoom(templateBoard_, accounts_, *state.username);
-    attachToMatch(state, gameRegistry_.matchFor(*state.username), /*isResume=*/false);
+    CreateRoomResult result = roomsService_.createRoom(*state.username);
+    attachToMatch(state, result.match, /*isResume=*/false);
 
     json response;
     response["type"] = "RoomCreatedEvent";
-    response["payload"] = {{"roomCode", code}};
+    response["payload"] = {{"roomCode", result.roomCode}};
     state.socket->send(response.dump());
-    Logger::info("Room created: username=" + *state.username + " roomCode=" + code);
+    Logger::info("Room created: username=" + *state.username + " roomCode=" + result.roomCode);
 }
 
 void GameWebSocketServer::handleJoinRoom(ConnectionState& state, const JoinRoomRequest& request) {
     if (!state.username.has_value() || state.match != nullptr) return;
 
-    matchmaker_.dequeue(*state.username);
     waitingByUsername_.erase(*state.username);
 
-    GameMatch* match = gameRegistry_.joinRoom(request.roomCode, *state.username);
-    if (match == nullptr) {
+    JoinRoomResult result = roomsService_.joinRoom(*state.username, request.roomCode);
+    if (!result.success) {
         json response;
         response["type"] = "JoinRoomFailedEvent";
         state.socket->send(response.dump());
         Logger::info("Join room failed: username=" + *state.username + " roomCode=" + request.roomCode);
         return;
     }
-    attachToMatch(state, match, /*isResume=*/false);
+    attachToMatch(state, result.match, /*isResume=*/false);
 }
 
 void GameWebSocketServer::handleFindMatch(ix::WebSocket* rawConnection, ConnectionState& state) {
     if (!state.username.has_value() || state.match != nullptr) return;
 
     int rating = accounts_.ratingFor(*state.username).value_or(1200);
-    matchmaker_.enqueue(*state.username, rating);
+    matchQueue_.enqueue(*state.username, rating);
     waitingByUsername_[*state.username] = rawConnection;
     Logger::info("Enqueued for matchmaking: username=" + *state.username + " rating=" + std::to_string(rating));
 }
@@ -204,7 +203,7 @@ void GameWebSocketServer::handleClose(ix::WebSocket* rawConnection, ConnectionSt
         }
         state.match->removeConnection(rawConnection);
     } else if (state.username.has_value()) {
-        matchmaker_.dequeue(*state.username);
+        matchQueue_.dequeue(*state.username);
         waitingByUsername_.erase(*state.username);
         Logger::info("Client disconnected while waiting for a match (username=" + *state.username + ")");
     } else {

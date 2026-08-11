@@ -1,0 +1,28 @@
+# Reused as-is by the promtail sidecar in matchmaker/ws-gateway/api-gateway
+# Deployments (see the "logs" emptyDir volume in each -- Docker Desktop's
+# default storage class doesn't support ReadWriteMany, so each pod ships its
+# own single log file instead of sharing one volume the way docker-compose did).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: promtail-sidecar-config
+data:
+  config.yml: |
+    server:
+      http_listen_port: 9080
+      grpc_listen_port: 0
+
+    positions:
+      filename: /tmp/positions.yaml
+
+    clients:
+      - url: http://loki:3100/loki/api/v1/push
+
+    scrape_configs:
+      - job_name: ctd-server
+        static_configs:
+          - targets:
+              - localhost
+            labels:
+              job: ctd-server
+              __path__: /logs/*.log
