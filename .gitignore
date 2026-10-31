@@ -8,7 +8,6 @@ CMakeFiles/
 cmake_install.cmake
 Testing/
 server/build/
-server/third_party/
 ui/CTD26-main/client/build/
 ui/CTD26-main/client/OpenCV_451/
 coverage_client/
