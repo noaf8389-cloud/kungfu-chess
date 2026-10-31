@@ -1,18 +1,29 @@
+# Build artifacts
 *.obj
 *.exe
 *.pdb
 *.ilk
-.vscode/
-.vs/
 CMakeCache.txt
 CMakeFiles/
 cmake_install.cmake
 Testing/
-ui/CTD26-main/client/build/
-ui/CTD26-main/client/OpenCV_451/
 server/build/
 server/third_party/
+ui/CTD26-main/client/build/
+ui/CTD26-main/client/OpenCV_451/
 coverage_client/
 coverage_server/
 LastCoverageResults.log
+
+# IDE
+.vscode/
+.vs/
+.idea/
+
+# Logs and local runtime data
 *.log
+*.db
+
+# OS
+.DS_Store
+Thumbs.db
