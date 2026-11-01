@@ -61,13 +61,15 @@ TEST_CASE("MoveStartedEvent round-trips through JSON") {
 }
 
 TEST_CASE("GameStartedEvent round-trips through JSON") {
-    GameStartedEvent original{2, 2, {"wK", ".", ".", "bK"}, 2500};
+    GameStartedEvent original{2, 2, {"wK", ".", ".", "bK"}, "alice", "bob", 2500};
     json j = original;
     GameStartedEvent restored = j.get<GameStartedEvent>();
 
     REQUIRE(restored.row_count == original.row_count);
     REQUIRE(restored.col_count == original.col_count);
     REQUIRE(restored.cells == original.cells);
+    REQUIRE(restored.white_username == original.white_username);
+    REQUIRE(restored.black_username == original.black_username);
     REQUIRE(restored.timestamp_ms == original.timestamp_ms);
 }
 

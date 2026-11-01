@@ -5,7 +5,8 @@
 #include "bus/event_serialization.hpp"
 #include "../game_session.hpp"
 
-NetworkPublisher::NetworkPublisher(EventBus& bus, GameSession& gameSession) : bus_(bus), gameSession_(gameSession) {
+NetworkPublisher::NetworkPublisher(EventBus& bus, GameSession& gameSession, PlayerRegistry& players)
+    : bus_(bus), gameSession_(gameSession), players_(players) {
     bus_.subscribe<MoveMadeEvent>([this](const MoveMadeEvent& e) {
         broadcast(toEnvelopeJson("MoveMadeEvent", e));
     });
@@ -43,7 +44,9 @@ void NetworkPublisher::addConnection(std::shared_ptr<ix::WebSocket> connection) 
         std::lock_guard lock(connectionsMutex_);
         connections_.push_back(connection);
     }
-    connection->send(toEnvelopeJson("GameStartedEvent", gameSession_.buildGameStartedEvent()));
+    std::string whiteUsername = players_.usernameForColor('w').value_or("?");
+    std::string blackUsername = players_.usernameForColor('b').value_or("?");
+    connection->send(toEnvelopeJson("GameStartedEvent", gameSession_.buildGameStartedEvent(whiteUsername, blackUsername)));
 }
 
 void NetworkPublisher::removeConnection(ix::WebSocket* connection) {

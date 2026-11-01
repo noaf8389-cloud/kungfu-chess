@@ -9,7 +9,7 @@ GameStartedEvent make_started_event_3x3() {
         "wR", ".", ".",
         ".", ".", ".",
         ".", ".", "bK"
-    }, 0};
+    }, "white", "black", 0};
 }
 }
 
@@ -43,7 +43,7 @@ TEST(client_board_state_applies_normal_capture) {
         "wR", ".", ".",
         ".", "bP", ".",
         ".", ".", "bK"
-    }, 0});
+    }, "white", "black", 0});
 
     // מהלך רגיל שמסתיים באכילה: MoveMadeEvent ואז PieceCapturedEvent, שני ה-Events מסכימים מי שרד.
     bus.publish(MoveMadeEvent{Position{0, 0}, Position{1, 1}, "wR", 1000});
@@ -101,7 +101,7 @@ TEST(client_board_state_tracks_multiple_independent_moves) {
         "wR", ".", ".",
         ".", ".", ".",
         "bR", ".", "."
-    }, 0});
+    }, "white", "black", 0});
 
     bus.publish(MoveMadeEvent{Position{0, 0}, Position{0, 1}, "wR", 1000});
     bus.publish(MoveMadeEvent{Position{2, 0}, Position{2, 1}, "bR", 1000});

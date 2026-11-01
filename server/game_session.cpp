@@ -84,7 +84,7 @@ void GameSession::update(long long deltaMs) {
     }
 }
 
-GameStartedEvent GameSession::buildGameStartedEvent() const {
+GameStartedEvent GameSession::buildGameStartedEvent(const std::string& whiteUsername, const std::string& blackUsername) const {
     std::lock_guard lock(mutex_);
 
     const Board& board = gameState_.getBoard();
@@ -95,7 +95,7 @@ GameStartedEvent GameSession::buildGameStartedEvent() const {
             cells.push_back(board.getCell(row, col));
         }
     }
-    return GameStartedEvent{board.getRowCount(), board.getColCount(), cells, gameState_.getCurrentTime()};
+    return GameStartedEvent{board.getRowCount(), board.getColCount(), cells, whiteUsername, blackUsername, gameState_.getCurrentTime()};
 }
 
 void GameSession::forfeit(char forfeitingColor) {

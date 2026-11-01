@@ -23,6 +23,8 @@ struct GameStartedEvent {
     int row_count;
     int col_count;
     std::vector<std::string> cells;
+    std::string white_username;
+    std::string black_username;
     long long timestamp_ms;
 };
 

@@ -70,8 +70,21 @@ TEST(player_panel_tracker_uses_the_board_size_from_game_started_event_for_ranks)
     EventBus bus;
     PlayerPanelTracker tracker(bus);
 
-    bus.publish(GameStartedEvent{4, 4, std::vector<std::string>(16, "."), 0});
+    bus.publish(GameStartedEvent{4, 4, std::vector<std::string>(16, "."), "white", "black", 0});
     bus.publish(MoveMadeEvent{Position{0, 0}, Position{0, 3}, "wR", 1000});
 
     EXPECT_EQ(tracker.white().moves[0], std::string("Rd4"));   // rank = 4 - 0, לא 8 - 0
+}
+
+TEST(player_panel_tracker_reads_usernames_from_game_started_event) {
+    EventBus bus;
+    PlayerPanelTracker tracker(bus);
+
+    EXPECT_EQ(tracker.white().username, std::string("?"));
+    EXPECT_EQ(tracker.black().username, std::string("?"));
+
+    bus.publish(GameStartedEvent{4, 4, std::vector<std::string>(16, "."), "alice", "bob", 0});
+
+    EXPECT_EQ(tracker.white().username, std::string("alice"));
+    EXPECT_EQ(tracker.black().username, std::string("bob"));
 }

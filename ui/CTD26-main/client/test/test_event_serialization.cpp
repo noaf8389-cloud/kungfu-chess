@@ -30,13 +30,15 @@ TEST(piece_captured_event_round_trips_through_json) {
 }
 
 TEST(game_started_event_round_trips_through_json) {
-    GameStartedEvent e{2, 2, {"wR", "--", "--", "bR"}, 0};
+    GameStartedEvent e{2, 2, {"wR", "--", "--", "bR"}, "alice", "bob", 0};
     json j = e;
     GameStartedEvent back = j.get<GameStartedEvent>();
     EXPECT_EQ(back.row_count, 2);
     EXPECT_EQ(back.col_count, 2);
     EXPECT_EQ(back.cells.size(), size_t(4));
     EXPECT_EQ(back.cells[0], std::string("wR"));
+    EXPECT_EQ(back.white_username, std::string("alice"));
+    EXPECT_EQ(back.black_username, std::string("bob"));
     EXPECT_EQ(back.timestamp_ms, 0);
 }
 

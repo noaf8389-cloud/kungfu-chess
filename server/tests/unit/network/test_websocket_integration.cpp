@@ -99,6 +99,11 @@ TEST_CASE("two clients log in, get matched, and a click broadcasts to both over 
     REQUIRE(waitFor([&]() { return receivedContains(mutexA, receivedA, "GameStartedEvent"); }));
     REQUIRE(waitFor([&]() { return receivedContains(mutexB, receivedB, "GameStartedEvent"); }));
 
+    REQUIRE(receivedContains(mutexA, receivedA, "alice"));
+    REQUIRE(receivedContains(mutexA, receivedA, "bob"));
+    REQUIRE(receivedContains(mutexB, receivedB, "alice"));
+    REQUIRE(receivedContains(mutexB, receivedB, "bob"));
+
     // Color assignment order isn't deterministic across the two clients, so both
     // send the same clicks — only the one actually holding white will take effect.
     clientA.send(R"({"command":"click","row":0,"col":0})");

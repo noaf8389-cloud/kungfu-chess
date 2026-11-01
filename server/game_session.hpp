@@ -19,7 +19,7 @@ public:
     void update(long long deltaMs);
 
     /// Builds a snapshot of the current board as a GameStartedEvent, for a newly connected client.
-    GameStartedEvent buildGameStartedEvent() const;
+    GameStartedEvent buildGameStartedEvent(const std::string& whiteUsername, const std::string& blackUsername) const;
 
     /// Ends the game as a forfeit; the other color is declared the winner.
     void forfeit(char forfeitingColor);

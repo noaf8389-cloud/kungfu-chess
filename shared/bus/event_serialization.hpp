@@ -18,7 +18,7 @@ inline void from_json(const json& j, Position& p) {
 
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(MoveMadeEvent, from, to, piece_token, timestamp_ms)
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(PieceCapturedEvent, at, capturing_piece_token, captured_piece_token, timestamp_ms)
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(GameStartedEvent, row_count, col_count, cells, timestamp_ms)
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(GameStartedEvent, row_count, col_count, cells, white_username, black_username, timestamp_ms)
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(MoveStartedEvent, from, to, piece_token, duration_ms, timestamp_ms)
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(JumpStartedEvent, position, piece_token, duration_ms, timestamp_ms)
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(JumpLandedEvent, position, piece_token, timestamp_ms)

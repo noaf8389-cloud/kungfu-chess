@@ -8,7 +8,7 @@ GameMatch::GameMatch(Board startingBoard, PlayerAccountStore& accounts, NatsPubl
     : gameState_(std::move(startingBoard)),
       session_(gameState_, bus_),
       commandHandler_(session_),
-      publisher_(bus_, session_),
+      publisher_(bus_, session_, players_),
       ownedHistoryStore_(std::make_unique<NoOpGameHistoryStore>()), historyStore_(*ownedHistoryStore_),
       ratingUpdater_(bus_, players_, accounts, historyStore_),
       natsEventMirror_(bus_, natsPublisher) {
@@ -20,7 +20,7 @@ GameMatch::GameMatch(Board startingBoard, PlayerAccountStore& accounts, NatsPubl
     : gameState_(std::move(startingBoard)),
       session_(gameState_, bus_),
       commandHandler_(session_),
-      publisher_(bus_, session_),
+      publisher_(bus_, session_, players_),
       historyStore_(historyStore),
       ratingUpdater_(bus_, players_, accounts, historyStore_),
       natsEventMirror_(bus_, natsPublisher) {
