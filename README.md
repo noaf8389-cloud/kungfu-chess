@@ -1,20 +1,26 @@
 # KungFu Chess
 
-![CI](https://github.com/<username>/<repo-name>/actions/workflows/ci.yml/badge.svg)
+![CI](https://github.com/noaf8389-cloud/kungfu-chess/actions/workflows/ci.yml/badge.svg)
 
-A real-time chess variant — pieces move independently and simultaneously, gated by per-piece movement/rest cooldowns instead of alternating turns — with a server-authoritative C++ engine and a cloud-native, horizontally-shardable backend.
+A real-time chess variant where pieces move independently and simultaneously, gated by per-piece movement and rest cooldowns instead of alternating turns.
+
+Built on a server-authoritative C++ engine and a containerized, multi-service backend with load-based match sharding.
+
+**Tech stack:** C++17 · CMake · WebSocket · PostgreSQL · Redis · NATS · Docker · Kubernetes · OpenCV
+
+https://github.com/user-attachments/assets/3a96930e-9872-4153-8238-6ed714c952e6
 
 ## Game Engine Design
 
-Before any networking or cloud infrastructure, the core problem is: pieces move independently and simultaneously, each gated by its own travel time and cooldown — not alternating turns. A handful of design decisions make that work cleanly.
+Before any networking or cloud infrastructure, the core problem is pieces moving independently and simultaneously, each gated by its own travel time and cooldown instead of alternating turns. A few design decisions make that work.
 
-**Time-based move completion, not a turn state machine.** A move's duration is `distance × MS_PER_CELL` (1000ms per cell); a jump is a fixed 1000ms airborne, followed by a 1000ms rest, while a normal move is followed by a 3000ms rest. `GameState` tracks every in-flight move/jump/rest against a single logical clock, advanced explicitly by `update(deltaMs)` on every server tick — **not** `std::chrono::now()`. Two pieces moving at once each complete independently, on their own schedule — the actual mechanic that makes the variant real-time instead of turn-based. It also makes the whole timing system deterministic and trivial to unit-test: a test fast-forwards with `update(100000)` instead of sleeping.
+**Time-based move completion, not a turn state machine.** A move's duration is `distance × MS_PER_CELL` (1000ms per cell). A jump is a fixed 1000ms airborne, followed by a 1000ms rest; a normal move is followed by a 3000ms rest. `GameState` tracks every in-flight move, jump, and rest against a single logical clock, advanced explicitly by `update(deltaMs)` on every server tick, not `std::chrono::now()`. Two pieces moving at once each complete independently, on their own schedule, which is what makes the variant real-time instead of turn-based. It also makes the timing system deterministic and easy to unit test: a test fast-forwards with `update(100000)` instead of sleeping.
 
-**Server-authoritative, full stop.** The client only ever sends a click or a jump intent. Every legality check (`RulesEngine` dispatching to one `PieceRule` per piece type — `RookRule`, `BishopRule`, `QueenRule`, `KingRule`, `KnightRule`, `PawnRule`, plus `CastlingRules`), every timing decision, and every outcome (`RealTimeArbiter`, which resolves whichever in-flight moves/jumps have reached their completion time each tick — captures, promotion, game-over) happens server-side. The client renders purely from broadcast events; it never decides anything. This is the one rule that carried unchanged into the cloud architecture below: *neither the client nor any Gateway ever decides game rules — the authoritative engine does.*
+**Server-authoritative.** The client only ever sends a click or a jump intent. Every legality check (`RulesEngine` dispatching to one `PieceRule` per piece type: `RookRule`, `BishopRule`, `QueenRule`, `KingRule`, `KnightRule`, `PawnRule`, plus `CastlingRules`), every timing decision, and every outcome (`RealTimeArbiter`, which resolves whichever in-flight moves and jumps have reached their completion time each tick: captures, promotion, game-over) happens server-side. The client renders purely from broadcast events and never decides anything. This principle carried unchanged into the cloud architecture below: neither the client nor any Gateway ever decides game rules; the authoritative engine does.
 
-**Game logic has zero knowledge that a network exists.** `GameSession` and `RealTimeArbiter` only publish plain domain events — `MoveStartedEvent`, `PieceCapturedEvent`, `JumpLandedEvent`, `GameOverEvent`, and so on — onto an in-process `EventBus`. `NetworkPublisher` (WebSocket broadcast), `RatingUpdater` (ELO), and `NatsEventMirror` (cross-process event mirroring) are just independent subscribers to the same bus; nothing in the game loop imports a socket, a database, or a message queue. Rating updates, match history, and NATS mirroring were each added later with zero changes to the core game loop — the same decoupling principle the service split below scales up to process boundaries.
+**Game logic has no knowledge that a network exists.** `GameSession` and `RealTimeArbiter` only publish plain domain events (`MoveStartedEvent`, `PieceCapturedEvent`, `JumpLandedEvent`, `GameOverEvent`, and others) onto an in-process `EventBus`. `NetworkPublisher` (WebSocket broadcast), `RatingUpdater` (ELO), and `NatsEventMirror` (cross-process event mirroring) are independent subscribers to the same bus. Nothing in the game loop imports a socket, a database, or a message queue. Rating updates, match history, and NATS mirroring were each added later with no changes to the core game loop, the same decoupling principle the service split below extends to process boundaries.
 
-**One `PieceRule` per piece type.** `RulesEngine::isLegalMove` dispatches to whichever `PieceRule` owns that piece — a small, deliberate strategy-pattern choice that keeps each piece's movement logic independently testable and makes adding a new piece type a pure addition, not an edit to a growing `switch`.
+**One `PieceRule` per piece type.** `RulesEngine::isLegalMove` dispatches to whichever `PieceRule` owns that piece: a strategy-pattern choice that keeps each piece's movement logic independently testable, and makes adding a new piece type an addition rather than an edit to a growing `switch`.
 
 ## Cloud Architecture
 
@@ -25,8 +31,8 @@ flowchart TB
     Client["OpenCV Client"]
 
     subgraph Edge["Edge"]
-        API["API Gateway\nlogin · rooms · history"]
-        WS["WS Gateway\nreal-time gameplay"]
+        API["API Gateway<br/>login · rooms · history"]
+        WS["WS Gateway<br/>real-time gameplay"]
     end
 
     subgraph Control["Control plane"]
@@ -34,12 +40,12 @@ flowchart TB
         GA["Game Allocator"]
     end
 
-    Shards["Game Server Shards\n(GameEngine, many live matches)"]
+    Shards["Game Server Shards<br/>(GameEngine, many live matches)"]
 
-    PG[(PostgreSQL\naccounts · history)]
-    Redis[(Redis\nqueue · lobby · shard index)]
-    NATS[(NATS\nevent mirror)]
-    Obs["Loki / Promtail\ncentralized logs + health checks"]
+    PG[(PostgreSQL<br/>accounts · history)]
+    Redis[(Redis<br/>queue · lobby · shard index)]
+    NATS[(NATS<br/>event mirror)]
+    Obs["Loki / Promtail<br/>centralized logs + health checks"]
 
     Client -- REST --> API
     Client -- WebSocket --> WS
@@ -66,14 +72,14 @@ flowchart TB
 | **Shared data layer** | PostgreSQL (accounts, game history), Redis (matchmaking queue, lobby identity, cross-shard game/room index), NATS (game-over event mirroring). |
 | **Observability** | Every service exposes `/health`; Loki + Promtail centralize logs from all of them. |
 
-Each service is a thin `main.cpp` wiring real collaborators together — the game engine above, the matchmaking logic, and the room/match registry are plain, independently unit-tested C++ classes with no networking code in them.
+Each service is a thin `main.cpp` wiring real collaborators together. The game engine above, the matchmaking logic, and the room/match registry are plain, independently unit-tested C++ classes with no networking code in them.
 
 ## Engineering highlights
 
 A few examples from the build process (full log in `Implementation_Roadmap.md`, Hebrew):
-- Found and fixed a race condition between two processes both running `CREATE TABLE IF NOT EXISTS` concurrently against Postgres on startup — not caught by any single-process test.
-- Found a genuine thread-safety bug (a shared Redis connection with no locking) through careful reasoning after an integration test became flaky under concurrent WebSocket connections — not a guess-and-check fix.
-- Traced an intermittent test crash (SIGABRT) to a timing assumption baked into the production WebSocket server code, by comparing against how the real server actually sequences its callbacks.
+- Fixed a race condition between two processes both running `CREATE TABLE IF NOT EXISTS` against Postgres on startup, which only showed up when both services started together.
+- Fixed a thread-safety bug in a shared Redis connection, diagnosed after an integration test became flaky under concurrent WebSocket connections.
+- Traced an intermittent test crash (SIGABRT) to a timing assumption in the WebSocket server's connection-handling code, by comparing it against how the production server actually sequences its callbacks.
 
 ## Tech stack
 
@@ -81,9 +87,16 @@ A few examples from the build process (full log in `Implementation_Roadmap.md`, 
 **Client:** C++17, OpenCV
 **Infrastructure:** Docker Compose · Kubernetes (`k8s/`) · PostgreSQL · Redis · NATS · Grafana Loki + Promtail · GitHub Actions
 
+## Prerequisites
+
+- Docker Desktop (for the Docker Compose / Kubernetes paths)
+- CMake 3.16+
+- A C++17 toolchain (Visual Studio 2022 on Windows)
+- OpenCV 4.5.1, for the client only: download from [this folder](https://drive.google.com/drive/folders/14SeyjbNPvsgyLKM2omcVTlTX0wAQ-_Ox?usp=sharing) and place it under `ui/CTD26-main/client/OpenCV_451`
+
 ## Running it
 
-**Docker Compose** (recommended — runs the full distributed system):
+**Docker Compose** (recommended, runs the full distributed system):
 ```powershell
 docker compose up --build
 ```
@@ -95,14 +108,25 @@ kubectl apply -f k8s/
 ```
 Deploys the same system onto a cluster (tested against Docker Desktop's built-in Kubernetes).
 
-**Native build** (Windows, single process — simplest path for client development):
+**Native build** (Windows, single process, simplest path for local development):
 ```powershell
 cd server
 cmake -B build
 cmake --build build --config Debug
-./build/Debug/KungFuChessServer.exe
+cd build
+./Debug/KungFuChessServer.exe
 ```
-Same game engine, no Postgres/Redis/NATS required (falls back to SQLite and in-memory stores). See [`ui/CTD26-main/client/`](ui/CTD26-main/client/) for the client build.
+Same game engine, no Postgres/Redis/NATS required (falls back to SQLite and in-memory stores).
+
+**Client** (needed to actually play, after starting a server above):
+```powershell
+cd ui/CTD26-main/client
+cmake -B build
+cmake --build build --config Debug
+cd build
+./Debug/KungFuChess.exe
+```
+Run two instances to play against yourself locally. Controls: left-click to select or move a piece, right-click to jump.
 
 ## Testing
 
@@ -137,19 +161,19 @@ docker-compose.yml, server/Dockerfile
 
 ## Documentation
 
-- [`Server_Design.md`](Server_Design.md) *(Hebrew)* — target cloud architecture and the reasoning behind it
-- [`Implementation_Roadmap.md`](Implementation_Roadmap.md) *(Hebrew)* — phase-by-phase build log: what was built, real bugs found and fixed along the way, and why
+- [`Server_Design.md`](Server_Design.md) *(Hebrew)*: target cloud architecture and the reasoning behind it
+- [`Implementation_Roadmap.md`](Implementation_Roadmap.md) *(Hebrew)*: phase-by-phase build log: what was built, real bugs found and fixed along the way, and why
 
 ## Status
 
-**Implemented:** real-time server-authoritative gameplay; rating-based matchmaking; rooms (create/join, including over REST); disconnect-grace reconnection; load-based multi-shard match allocation; PostgreSQL/Redis/NATS wired for real; centralized logging and health checks; Docker Compose and Kubernetes deployment; CI.
+**Implemented:** real-time server-authoritative gameplay; rating-based matchmaking; rooms (create/join, including over REST); disconnect-grace reconnection; load-based multi-shard match allocation; PostgreSQL/Redis/NATS wired for real; centralized logging and health checks; Docker Compose and Kubernetes deployment; CI; on-screen move log and score in the client.
 
 ## Roadmap
 
 What's deliberately scoped out so far, and why:
-- **Metrics, dashboards, and load testing** — today's observability is logs + health checks only. Deferred until there's a real traffic pattern to size dashboards and alert thresholds against, rather than guessing at numbers.
-- **True multi-node sharding** — today's shards are load-balanced but co-located in one `WsGateway` process; splitting them across real nodes needs network-level routing, not just in-process allocation.
-- **Horizontal autoscaling (HPA) / Agones-managed shard lifecycle** — needs the metrics above to scale against first.
+- **Metrics, dashboards, and load testing:** today's observability is logs + health checks only. Deferred until there's a real traffic pattern to size dashboards and alert thresholds against, rather than guessing at numbers.
+- **True multi-node sharding:** today's shards are load-balanced but co-located in one `WsGateway` process; splitting them across real nodes needs network-level routing, not just in-process allocation.
+- **Horizontal autoscaling (HPA) / Agones-managed shard lifecycle:** needs the metrics above to scale against first.
 - **Token-based auth and rate limiting** on the public API, ahead of any real external exposure.
 
 ## License
