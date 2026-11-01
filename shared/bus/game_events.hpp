@@ -28,6 +28,16 @@ struct GameStartedEvent {
     long long timestamp_ms;
 };
 
+// Broadcast to every connection already in a match whenever a new connection
+// joins it, so a player who connected before their opponent (and so received
+// "?" in their own GameStartedEvent) finds out the opponent's name once it's
+// known -- without resending the board itself, which would be unsafe once a
+// lone player in a room has already made moves.
+struct PlayersUpdatedEvent {
+    std::string white_username;
+    std::string black_username;
+};
+
 struct GameOverEvent {
     char winner_color;
     long long timestamp_ms;

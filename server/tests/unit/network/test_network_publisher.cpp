@@ -147,3 +147,81 @@ TEST_CASE("NetworkPublisher broadcasts every remaining event type to a connected
     clientA.stop();
     rawServer.stop();
 }
+
+TEST_CASE("NetworkPublisher notifies an already-connected client once the opponent's username is known") {
+    ix::initNetSystem();
+
+    FakeAccountStore accounts;
+    NatsPublisher natsPublisher;
+    GameMatch match(makeBoard(), accounts, natsPublisher);
+
+    const int port = 8912;
+    std::mutex serverSocketsMutex;
+    std::vector<std::shared_ptr<ix::WebSocket>> serverSockets;
+
+    ix::WebSocketServer rawServer(port, "0.0.0.0");
+    rawServer.setOnConnectionCallback(
+        [&serverSocketsMutex, &serverSockets](std::weak_ptr<ix::WebSocket> weakWebSocket, std::shared_ptr<ix::ConnectionState>) {
+            auto webSocket = weakWebSocket.lock();
+            if (!webSocket) return;
+            webSocket->setOnMessageCallback([](const ix::WebSocketMessagePtr&) {});
+            std::lock_guard<std::mutex> lock(serverSocketsMutex);
+            serverSockets.push_back(webSocket);
+        });
+    auto listenResult = rawServer.listen();
+    REQUIRE(listenResult.first);
+    rawServer.start();
+
+    std::mutex mutexA;
+    std::vector<std::string> receivedA;
+    ix::WebSocket clientA;
+    clientA.setUrl("ws://127.0.0.1:" + std::to_string(port));
+    clientA.setOnMessageCallback([&](const ix::WebSocketMessagePtr& msg) {
+        if (msg->type == ix::WebSocketMessageType::Message) {
+            std::lock_guard<std::mutex> lock(mutexA);
+            receivedA.push_back(msg->str);
+        }
+    });
+    clientA.start();
+    REQUIRE(waitFor([&]() { return clientA.getReadyState() == ix::ReadyState::Open; }));
+    REQUIRE(waitFor([&]() {
+        std::lock_guard<std::mutex> lock(serverSocketsMutex);
+        return serverSockets.size() >= 1;
+    }));
+
+    // clientA connects and is registered as "alice" before "bob" exists at
+    // all -- its own GameStartedEvent snapshot can only say "?" for black.
+    PlayerId aliceId = match.players().registerConnection();
+    match.players().setUsername(aliceId, "alice");
+    {
+        std::lock_guard<std::mutex> lock(serverSocketsMutex);
+        match.addConnection(serverSockets[0]);
+    }
+    REQUIRE(waitFor([&]() { return receivedContains(mutexA, receivedA, "GameStartedEvent"); }));
+    REQUIRE_FALSE(receivedContains(mutexA, receivedA, "bob"));
+
+    ix::WebSocket clientB;
+    clientB.setUrl("ws://127.0.0.1:" + std::to_string(port));
+    clientB.start();
+    REQUIRE(waitFor([&]() { return clientB.getReadyState() == ix::ReadyState::Open; }));
+    REQUIRE(waitFor([&]() {
+        std::lock_guard<std::mutex> lock(serverSocketsMutex);
+        return serverSockets.size() >= 2;
+    }));
+
+    PlayerId bobId = match.players().registerConnection();
+    match.players().setUsername(bobId, "bob");
+    {
+        std::lock_guard<std::mutex> lock(serverSocketsMutex);
+        match.addConnection(serverSockets[1]);
+    }
+
+    // clientA was already connected -- it should now receive a
+    // PlayersUpdatedEvent naming "bob", without a second GameStartedEvent.
+    REQUIRE(waitFor([&]() { return receivedContains(mutexA, receivedA, "bob"); }));
+    REQUIRE(receivedContains(mutexA, receivedA, "PlayersUpdatedEvent"));
+
+    clientA.stop();
+    clientB.stop();
+    rawServer.stop();
+}

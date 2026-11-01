@@ -25,6 +25,11 @@ PlayerPanelTracker::PlayerPanelTracker(EventBus& bus) {
         black_.username = e.black_username;
     });
 
+    bus.subscribe<PlayersUpdatedEvent>([this](const PlayersUpdatedEvent& e) {
+        white_.username = e.white_username;
+        black_.username = e.black_username;
+    });
+
     bus.subscribe<ScoreUpdatedEvent>([this](const ScoreUpdatedEvent& e) {
         if (e.color == 'w') white_.score = e.new_score;
         else black_.score = e.new_score;

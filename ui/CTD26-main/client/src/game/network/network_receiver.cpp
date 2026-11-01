@@ -10,6 +10,7 @@ NetworkReceiver::NetworkReceiver(ServerConnection& connection, EventBus& bus) : 
     handlers_["MoveMadeEvent"] = [this](const json& payload) { bus_.publish(payload.get<MoveMadeEvent>()); };
     handlers_["PieceCapturedEvent"] = [this](const json& payload) { bus_.publish(payload.get<PieceCapturedEvent>()); };
     handlers_["GameStartedEvent"] = [this](const json& payload) { bus_.publish(payload.get<GameStartedEvent>()); };
+    handlers_["PlayersUpdatedEvent"] = [this](const json& payload) { bus_.publish(payload.get<PlayersUpdatedEvent>()); };
     handlers_["GameOverEvent"] = [this](const json& payload) { bus_.publish(payload.get<GameOverEvent>()); };
     handlers_["ScoreUpdatedEvent"] = [this](const json& payload) { bus_.publish(payload.get<ScoreUpdatedEvent>()); };
     handlers_["MoveStartedEvent"] = [this](const json& payload) { bus_.publish(payload.get<MoveStartedEvent>()); };

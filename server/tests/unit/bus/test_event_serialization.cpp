@@ -73,6 +73,15 @@ TEST_CASE("GameStartedEvent round-trips through JSON") {
     REQUIRE(restored.timestamp_ms == original.timestamp_ms);
 }
 
+TEST_CASE("PlayersUpdatedEvent round-trips through JSON") {
+    PlayersUpdatedEvent original{"alice", "bob"};
+    json j = original;
+    PlayersUpdatedEvent restored = j.get<PlayersUpdatedEvent>();
+
+    REQUIRE(restored.white_username == original.white_username);
+    REQUIRE(restored.black_username == original.black_username);
+}
+
 TEST_CASE("RestEndedEvent round-trips through JSON") {
     RestEndedEvent original{Position{0, 3}, "bQ", 4200};
     json j = original;

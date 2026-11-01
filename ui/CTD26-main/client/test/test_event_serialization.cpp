@@ -42,6 +42,14 @@ TEST(game_started_event_round_trips_through_json) {
     EXPECT_EQ(back.timestamp_ms, 0);
 }
 
+TEST(players_updated_event_round_trips_through_json) {
+    PlayersUpdatedEvent e{"alice", "bob"};
+    json j = e;
+    PlayersUpdatedEvent back = j.get<PlayersUpdatedEvent>();
+    EXPECT_EQ(back.white_username, std::string("alice"));
+    EXPECT_EQ(back.black_username, std::string("bob"));
+}
+
 TEST(move_started_event_round_trips_through_json) {
     MoveStartedEvent e{Position{0, 0}, Position{0, 3}, "wR", 3000, 1000};
     json j = e;

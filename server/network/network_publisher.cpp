@@ -47,6 +47,7 @@ void NetworkPublisher::addConnection(std::shared_ptr<ix::WebSocket> connection) 
     std::string whiteUsername = players_.usernameForColor('w').value_or("?");
     std::string blackUsername = players_.usernameForColor('b').value_or("?");
     connection->send(toEnvelopeJson("GameStartedEvent", gameSession_.buildGameStartedEvent(whiteUsername, blackUsername)));
+    broadcast(toEnvelopeJson("PlayersUpdatedEvent", PlayersUpdatedEvent{whiteUsername, blackUsername}));
 }
 
 void NetworkPublisher::removeConnection(ix::WebSocket* connection) {

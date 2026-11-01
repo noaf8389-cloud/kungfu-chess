@@ -88,3 +88,16 @@ TEST(player_panel_tracker_reads_usernames_from_game_started_event) {
     EXPECT_EQ(tracker.white().username, std::string("alice"));
     EXPECT_EQ(tracker.black().username, std::string("bob"));
 }
+
+TEST(player_panel_tracker_updates_usernames_from_players_updated_event) {
+    EventBus bus;
+    PlayerPanelTracker tracker(bus);
+
+    bus.publish(GameStartedEvent{4, 4, std::vector<std::string>(16, "."), "alice", "?", 0});
+    EXPECT_EQ(tracker.black().username, std::string("?"));
+
+    bus.publish(PlayersUpdatedEvent{"alice", "bob"});
+
+    EXPECT_EQ(tracker.white().username, std::string("alice"));
+    EXPECT_EQ(tracker.black().username, std::string("bob"));
+}
