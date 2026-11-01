@@ -45,7 +45,10 @@ TEST_CASE("GameMatch mirrors a real GameOverEvent to NATS") {
     match.update(100000);
 
     natsMsg* msg = nullptr;
-    natsStatus status = natsSubscription_NextMsg(&msg, sub, 2000);
+    // 5s, not 2s: same reasoning as test_nats_publisher_integration.cpp -- this
+    // runs alongside Postgres/Redis/Loki/Promtail in the same docker-compose
+    // stack, and local round-trip latency can spike under load.
+    natsStatus status = natsSubscription_NextMsg(&msg, sub, 5000);
     REQUIRE(status == NATS_OK);
 
     std::string payload(natsMsg_GetData(msg), natsMsg_GetDataLength(msg));
